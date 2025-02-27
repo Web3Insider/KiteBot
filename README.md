@@ -14,7 +14,7 @@ A Node.js bot for interacting with the KiteAI testnet platform, featuring a clea
 ## Prerequisites
 
 - Node.js v16 or higher
-- A KiteAI testnet account [Register](https://testnet.gokite.ai?r=H7CKh96f)
+- A KiteAI testnet account [Register](https://testnet.gokite.ai?r=HcA5ZYNw)
 - A Groq API key Get it from https://console.groq.com
 
 ## Installation
