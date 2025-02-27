@@ -34,7 +34,7 @@ class Dashboard {
         border: { fg: "blue" },
       },
       content:
-        "{center}{bold}KiteAI BOT{/bold}{/center}\n{center}Codeberg: https://codeberg.org/Galkurta | Telegram: https://t.me/galkurtarchive{/center}",
+        "{center}{bold}KiteAI BOT{/bold}{/center}\n{center} {/center}",
     });
 
     this.logBox = this.grid.set(2, 0, 6, 12, blessed.log, {
