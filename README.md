@@ -22,8 +22,8 @@ A Node.js bot for interacting with the KiteAI testnet platform, featuring a clea
 1. Clone the repository:
 
 ```bash
-git clone https://codeberg.org/Galkurta/KiteAI-BOT.git
-cd KiteAI-BOT
+git clone https://github.com/Web3Insider/KiteBot.git
+cd KiteBot
 ```
 
 2. Install dependencies:
