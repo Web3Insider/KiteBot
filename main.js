@@ -5,6 +5,9 @@ import dashboard from "./src/ui/dashboard.js";
 import { sleep, formatError } from "./src/utils/helpers.js";
 
 let isRunning = true;
+const MAX_INTERACTIONS_PER_AGENT = 30;
+const WAIT_TIME_24HRS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
 const stats = {
   total: 0,
   successful: 0,
@@ -59,36 +62,35 @@ async function processAgentCycle(wallet, agentId, agentName) {
   }
 }
 
-async function processWallet(wallet, cycleCount) {
+async function processWallet(wallet) {
   dashboard.log(`Processing wallet: ${wallet}`);
-  dashboard.updateStatus(wallet, cycleCount, Date.now() - startTime);
 
-  for (const [agentId, agentName] of Object.entries(agents)) {
-    if (!isRunning) break;
+  for (let i = 0; i < MAX_INTERACTIONS_PER_AGENT; i++) {
+    for (const [agentId, agentName] of Object.entries(agents)) {
+      if (!isRunning) return;
 
-    await processAgentCycle(wallet, agentId, agentName);
+      await processAgentCycle(wallet, agentId, agentName);
 
-    if (isRunning) {
-      const waitTime = rateLimitConfig.intervalBetweenCycles / 1000;
-      dashboard.log(`Waiting ${waitTime} seconds before next attempt...`);
-      await sleep(rateLimitConfig.intervalBetweenCycles);
+      if (isRunning) {
+        const waitTime = rateLimitConfig.intervalBetweenCycles / 1000;
+        dashboard.log(`Waiting ${waitTime} seconds before next attempt...`);
+        await sleep(rateLimitConfig.intervalBetweenCycles);
+      }
     }
   }
 }
 
-async function startContinuousProcess(wallets) {
-  let cycleCount = 1;
-
+async function startProcess(wallets) {
   while (isRunning) {
-    dashboard.log(`Starting Cycle #${cycleCount}`);
+    dashboard.log("Starting a new execution cycle...");
 
     for (const wallet of wallets) {
-      if (!isRunning) break;
-      await processWallet(wallet, cycleCount);
+      if (!isRunning) return;
+      await processWallet(wallet);
     }
 
-    cycleCount++;
-    dashboard.updateProgress((cycleCount % 10) * 10);
+    dashboard.log(`All agents completed ${agents.length * MAX_INTERACTIONS_PER_AGENT} interactions. Waiting 24 hours...`);
+    await sleep(WAIT_TIME_24HRS);
   }
 }
 
@@ -103,7 +105,7 @@ async function main() {
     dashboard.log(`Loaded ${wallets.length} wallets from data.txt`);
     dashboard.updateStatus("Initializing...");
 
-    await startContinuousProcess(wallets);
+    await startProcess(wallets);
   } catch (error) {
     dashboard.log(`An error occurred: ${formatError(error)}`);
     process.exit(1);
