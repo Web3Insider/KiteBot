@@ -105,12 +105,6 @@ export const rateLimitConfig = {
 4. Push to the branch
 5. Open a Pull Request
 
-## Links
-
-- [Codeberg](https://codeberg.org/Galkurta)
-- [Telegram](https://t.me/galkurtarchive)
-- [KiteAI Testnet](https://testnet.gokite.ai?r=H7CKh96f)
-
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
