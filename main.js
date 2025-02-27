@@ -5,9 +5,6 @@ import dashboard from "./src/ui/dashboard.js";
 import { sleep, formatError } from "./src/utils/helpers.js";
 
 let isRunning = true;
-const MAX_INTERACTIONS_PER_AGENT = 30;
-const WAIT_TIME_24HRS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-
 const stats = {
   total: 0,
   successful: 0,
@@ -15,6 +12,9 @@ const stats = {
 };
 
 const startTime = Date.now();
+
+// Track interaction count and cooldown per wallet
+const walletStates = new Map();
 
 process.on("SIGINT", () => {
   dashboard.log("Stopping the script gracefully...");
@@ -62,35 +62,75 @@ async function processAgentCycle(wallet, agentId, agentName) {
   }
 }
 
-async function processWallet(wallet) {
+async function processWallet(wallet, cycleCount) {
   dashboard.log(`Processing wallet: ${wallet}`);
+  dashboard.updateStatus(wallet, cycleCount, Date.now() - startTime);
 
-  for (let i = 0; i < MAX_INTERACTIONS_PER_AGENT; i++) {
-    for (const [agentId, agentName] of Object.entries(agents)) {
-      if (!isRunning) return;
+  // Initialize wallet state if not exists
+  if (!walletStates.has(wallet)) {
+    walletStates.set(wallet, { interactions: 0, cooldownStart: null });
+  }
+  const state = walletStates.get(wallet);
 
-      await processAgentCycle(wallet, agentId, agentName);
+  // Handle cooldown logic
+  if (state.interactions >= 100) {
+    const now = Date.now();
+    if (state.cooldownStart === null) {
+      state.cooldownStart = now;
+      dashboard.log(`Wallet ${wallet} reached 100 interactions. Starting 24h cooldown.`);
+      return;
+    }
 
-      if (isRunning) {
-        const waitTime = rateLimitConfig.intervalBetweenCycles / 1000;
-        dashboard.log(`Waiting ${waitTime} seconds before next attempt...`);
-        await sleep(rateLimitConfig.intervalBetweenCycles);
-      }
+    const cooldownDuration = 24 * 60 * 60 * 1000; // 24 hours
+    if (now - state.cooldownStart < cooldownDuration) {
+      const remaining = cooldownDuration - (now - state.cooldownStart);
+      const remainingHours = Math.ceil(remaining / (1000 * 60 * 60));
+      dashboard.log(`Wallet ${wallet} in cooldown. ${remainingHours} hours remaining. Skipping.`);
+      return;
+    }
+
+    // Reset if cooldown completed
+    state.interactions = 0;
+    state.cooldownStart = null;
+    dashboard.log(`Wallet ${wallet} cooldown finished. Resuming interactions.`);
+  }
+
+  // Process agents
+  for (const [agentId, agentName] of Object.entries(agents)) {
+    if (!isRunning) break;
+
+    await processAgentCycle(wallet, agentId, agentName);
+    state.interactions++;
+
+    // Check if reached interaction limit
+    if (state.interactions >= 100) {
+      state.cooldownStart = Date.now();
+      dashboard.log(`Wallet ${wallet} reached 100 interactions. Cooldown started.`);
+      break;
+    }
+
+    if (isRunning) {
+      const waitTime = rateLimitConfig.intervalBetweenCycles / 1000;
+      dashboard.log(`Waiting ${waitTime} seconds before next attempt...`);
+      await sleep(rateLimitConfig.intervalBetweenCycles);
     }
   }
 }
 
-async function startProcess(wallets) {
+// Rest of the code remains unchanged
+async function startContinuousProcess(wallets) {
+  let cycleCount = 1;
+
   while (isRunning) {
-    dashboard.log("Starting a new execution cycle...");
+    dashboard.log(`Starting Cycle #${cycleCount}`);
 
     for (const wallet of wallets) {
-      if (!isRunning) return;
-      await processWallet(wallet);
+      if (!isRunning) break;
+      await processWallet(wallet, cycleCount);
     }
 
-    dashboard.log(`All agents completed ${agents.length * MAX_INTERACTIONS_PER_AGENT} interactions. Waiting 24 hours...`);
-    await sleep(WAIT_TIME_24HRS);
+    cycleCount++;
+    dashboard.updateProgress((cycleCount % 10) * 10);
   }
 }
 
@@ -105,7 +145,7 @@ async function main() {
     dashboard.log(`Loaded ${wallets.length} wallets from data.txt`);
     dashboard.updateStatus("Initializing...");
 
-    await startProcess(wallets);
+    await startContinuousProcess(wallets);
   } catch (error) {
     dashboard.log(`An error occurred: ${formatError(error)}`);
     process.exit(1);
